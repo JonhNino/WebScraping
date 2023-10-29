@@ -4,15 +4,15 @@ from selenium.webdriver.common.by import By
 import pandas as pd
 import time
 from selenium.common.exceptions import NoSuchElementException
+import re  # Para procesar las cadenas y extraer el número de la disponibilidad
 
-
-service = Service("C:/Windows/chromedriver_win32/chromedriver.exe")
+service = Service("C:/Windows/chromedriver-win64/chromedriver-win64/chromedriver.exe")
 driver = webdriver.Chrome(service=service)
 driver.get("https://books.toscrape.com/")
 print(driver.title)
 
 records = []
-
+book_id = 1  # Inicializar el ID del libro
 
 def get_element_text_safe(css_selector):
     try:
@@ -20,8 +20,21 @@ def get_element_text_safe(css_selector):
     except NoSuchElementException:
         return None
 
+def get_element_text_after_th(th_text):
+    rows = driver.find_elements(By.CSS_SELECTOR, "table th")
+    for row in rows:
+        if row.text == th_text:
+            return row.find_element(By.XPATH, "following-sibling::td").text
+    return None
 
-while True:  # Continúa hasta que no haya más páginas
+def get_star_rating():
+    try:
+        star_element = driver.find_element(By.CSS_SELECTOR, "div.product_rating p[class^='star-rating']")
+        return star_element.get_attribute("class").split(" ")[1]
+    except NoSuchElementException:
+        return None
+
+while True:
     book_links = driver.find_elements(By.CSS_SELECTOR, "h3 a")
     book_links = [link.get_attribute("href") for link in book_links]
 
@@ -29,36 +42,54 @@ while True:  # Continúa hasta que no haya más páginas
         driver.get(link)
         title = get_element_text_safe("h1")
         price = get_element_text_safe(".price_color")
-        stock = get_element_text_safe(".instock.availability")
-        
+        stock_text = get_element_text_safe(".instock.availability")
+        stock_number = int(re.search(r'(\d+)', stock_text).group()) if stock_text else None
+
         try:
             description = driver.find_element(By.CSS_SELECTOR, "#product_description + p").text
         except NoSuchElementException:
             description = None
-            
+
         category = get_element_text_safe("ul.breadcrumb li:nth-child(3) a")
+        image_url = driver.find_element(By.CSS_SELECTOR, ".carousel-inner img").get_attribute("src")
+        star_rating = get_star_rating()
+
+        upc = get_element_text_after_th('UPC')
+        product_type = get_element_text_after_th('Product Type')
+        price_excl_tax = get_element_text_after_th('Price (excl. tax)')
+        price_incl_tax = get_element_text_after_th('Price (incl. tax)')
+        tax = get_element_text_after_th('Tax')
+        reviews = get_element_text_after_th('Number of reviews')
 
         book_data = {
+            "ID": book_id,
             "title": title,
             "price": price,
-            "stock": stock,
+            "stock": stock_number,
             "description": description,
             "category": category,
-            "link": link
+            "link": link,
+            "image_url": image_url,
+            "star_rating": star_rating,
+            "upc": upc,
+            "product_type": product_type,
+            "price_excl_tax": price_excl_tax,
+            "price_incl_tax": price_incl_tax,
+            "tax": tax,
+            "number_of_reviews": reviews
         }
 
         records.append(book_data)
-        driver.back()  # Regresa a la página de lista de libros
+        book_id += 1
+        driver.back()
 
     next_page = driver.find_elements(By.CSS_SELECTOR, "li.next a")
     if not next_page:
-        break  # No hay más páginas, termina el loop
-    next_page[0].click()  # Va a la siguiente página
-    time.sleep(2)  # Espera antes de cargar la siguiente página para evitar sobrecargar el servidor
+        break
+    next_page[0].click()
+    time.sleep(2)
 
-# Crear un DataFrame y guardar a CSV
 df = pd.DataFrame(records)
-df.to_csv("books.csv", index=False)
+df.to_csv("books2.csv", sep=";", index=False)
 
-# Cerrar el navegador
 driver.close()
