@@ -29,10 +29,12 @@ def get_element_text_after_th(th_text):
 
 def get_star_rating():
     try:
-        star_element = driver.find_element(By.CSS_SELECTOR, "div.product_rating p[class^='star-rating']")
+        star_element = driver.find_element(By.CSS_SELECTOR, "p.star-rating")
         return star_element.get_attribute("class").split(" ")[1]
     except NoSuchElementException:
         return None
+
+
 
 while True:
     book_links = driver.find_elements(By.CSS_SELECTOR, "h3 a")
@@ -90,6 +92,6 @@ while True:
     time.sleep(2)
 
 df = pd.DataFrame(records)
-df.to_csv("books2.csv", sep=";", index=False)
+df.to_csv("books4.csv", sep=";", index=False)
 
 driver.close()
